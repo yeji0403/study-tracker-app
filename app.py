@@ -5,7 +5,7 @@ from datetime import date, timedelta
 st.set_page_config(page_title="감정평가사 학습 루틴 트래커", layout="wide")
 
 # URL 파라미터 확인
-params = st.experimental_get_query_params()
+params = st.query_params
 is_widget_mode = params.get("mode", [""])[0] == "today"
 
 if not is_widget_mode:
