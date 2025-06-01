@@ -1,17 +1,19 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="감정평가사 학습 루틴 트래커", layout="wide")
 
-# URL 파라미터 확인
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1u5HqZ8aslCoIxMyNnyihfyWp5OTj7-pMXg6TjgMLY1c/edit#gid=0"
+
 params = st.query_params
 is_widget_mode = params.get("mode", [""])[0] == "today"
 
 if not is_widget_mode:
     st.title("📘 감정평가사 학습 루틴 관리")
 
-# 자동 생성된 주차별 학습 계획
 @st.cache_data
 def generate_schedule():
     start_date = date(2025, 6, 3)
@@ -31,7 +33,6 @@ if "df" not in st.session_state:
 
 df = st.session_state.df.copy()
 
-# 📌 오늘의 목표 위젯
 st.markdown("## 📌 오늘의 목표")
 today = date.today()
 today_week = df[df["시작일"] <= today].iloc[-1] if not df[df["시작일"] <= today].empty else None
@@ -74,6 +75,16 @@ if not is_widget_mode:
             st.session_state.df.at[row["index"], "세부 계획"] = new_plan
             st.session_state.df.at[row["index"], "Gemini 질문 예시"] = new_q
             st.session_state.df.at[row["index"], "학습 완료"] = new_done
+
+    if st.button("변경 내용 저장"):
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_url(SHEET_URL)
+        worksheet = sh.sheet1
+        worksheet.clear()
+        worksheet.update([st.session_state.df.columns.values.tolist()] + st.session_state.df.values.tolist())
+        st.success("✅ Google Sheets에 저장되었습니다.")
 
     with st.expander("📌 미완료 루틴 리마인더", expanded=False):
         undone_df = st.session_state.df[~st.session_state.df["학습 완료"]].sort_values("시작일")
