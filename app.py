@@ -28,6 +28,7 @@ def generate_schedule():
 # 데이터 불러오기 또는 생성
 if os.path.exists(CSV_FILE):
     df = pd.read_csv(CSV_FILE)
+df["시작일"] = pd.to_datetime(df["시작일"])
     df["학습 완료"] = df["학습 완료"].astype(bool)
 else:
     df = generate_schedule()
