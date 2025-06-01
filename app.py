@@ -10,7 +10,6 @@ is_widget_mode = params.get("mode", [""])[0] == "today"
 
 CSV_FILE = "study_tracker_data.csv"
 
-# 자동 생성된 주차별 학습 계획
 @st.cache_data
 def generate_schedule():
     start_date = date(2025, 6, 3)
@@ -25,10 +24,10 @@ def generate_schedule():
         weeks.append([month, i, week_label, subject, week_start, "", "", False])
     return pd.DataFrame(weeks, columns=["월", "고유주차", "주차", "과목", "시작일", "세부 계획", "Gemini 질문 예시", "학습 완료"])
 
-# 데이터 불러오기 또는 생성
 if os.path.exists(CSV_FILE):
     df = pd.read_csv(CSV_FILE)
     df["학습 완료"] = df["학습 완료"].astype(bool)
+    df["시작일"] = pd.to_datetime(df["시작일"]).dt.date
 else:
     df = generate_schedule()
 
@@ -83,7 +82,6 @@ if not is_widget_mode:
             st.session_state.df.at[row["index"], "Gemini 질문 예시"] = new_q
             st.session_state.df.at[row["index"], "학습 완료"] = new_done
 
-    # 자동 저장
     st.session_state.df.to_csv(CSV_FILE, index=False)
 
     with st.expander("📌 미완료 루틴 리마인더", expanded=False):
