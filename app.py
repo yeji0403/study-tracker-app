@@ -1,19 +1,16 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-import gspread
-from google.oauth2.service_account import Credentials
+import os
 
 st.set_page_config(page_title="감정평가사 학습 루틴 트래커", layout="wide")
-
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1u5HqZ8aslCoIxMyNnyihfyWp5OTj7-pMXg6TjgMLY1c/edit#gid=0"
 
 params = st.query_params
 is_widget_mode = params.get("mode", [""])[0] == "today"
 
-if not is_widget_mode:
-    st.title("📘 감정평가사 학습 루틴 관리")
+CSV_FILE = "study_tracker_data.csv"
 
+# 자동 생성된 주차별 학습 계획
 @st.cache_data
 def generate_schedule():
     start_date = date(2025, 6, 3)
@@ -28,10 +25,20 @@ def generate_schedule():
         weeks.append([month, i, week_label, subject, week_start, "", "", False])
     return pd.DataFrame(weeks, columns=["월", "고유주차", "주차", "과목", "시작일", "세부 계획", "Gemini 질문 예시", "학습 완료"])
 
+# 데이터 불러오기 또는 생성
+if os.path.exists(CSV_FILE):
+    df = pd.read_csv(CSV_FILE)
+    df["학습 완료"] = df["학습 완료"].astype(bool)
+else:
+    df = generate_schedule()
+
 if "df" not in st.session_state:
-    st.session_state.df = generate_schedule()
+    st.session_state.df = df.copy()
 
 df = st.session_state.df.copy()
+
+if not is_widget_mode:
+    st.title("📘 감정평가사 학습 루틴 관리")
 
 st.markdown("## 📌 오늘의 목표")
 today = date.today()
@@ -76,15 +83,8 @@ if not is_widget_mode:
             st.session_state.df.at[row["index"], "Gemini 질문 예시"] = new_q
             st.session_state.df.at[row["index"], "학습 완료"] = new_done
 
-    if st.button("변경 내용 저장"):
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-        gc = gspread.authorize(creds)
-        sh = gc.open_by_url(SHEET_URL)
-        worksheet = sh.sheet1
-        worksheet.clear()
-        worksheet.update([st.session_state.df.columns.values.tolist()] + st.session_state.df.values.tolist())
-        st.success("✅ Google Sheets에 저장되었습니다.")
+    # 자동 저장
+    st.session_state.df.to_csv(CSV_FILE, index=False)
 
     with st.expander("📌 미완료 루틴 리마인더", expanded=False):
         undone_df = st.session_state.df[~st.session_state.df["학습 완료"]].sort_values("시작일")
@@ -114,4 +114,4 @@ if not is_widget_mode:
         mime='text/csv'
     )
 
-    st.caption("✅ 좌측에서 월을 선택하면 해당 주차의 루틴만 간결하게 확인하고 수정할 수 있습니다. 목표와 진도율도 함께 관리해보세요.")
+    st.caption("✅ 월을 선택하면 주차별 루틴을 확인하고 수정할 수 있습니다. 변경사항은 자동 저장됩니다.")
